@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Wheel and Palettes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+        canvas {
+            display: block;
+            margin: 20px auto;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+
+        .controls {
+            margin: 20px auto;
+        }
+
+        .controls button {
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+
+        .input-container {
+            margin: 20px auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .color-div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .color-picker,
+        .hex-input {
+            margin: 5px 0;
+        }
+
+        .hex-input {
+            width: 80px;
+            padding: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Color Wheel and Palette Generator</h1>
+    <canvas id="colorWheel" width="600" height="600"></canvas>
+    <div class="controls">
+        <label for="basecolor">Select your base color:</label>
+        <input type="color" id="basecolor" value="#ff0000">
+        <button onclick="generateScheme('analogous')">Analogous</button>
+        <button onclick="generateScheme('monochromatic')">Monochromatic</button>
+        <button onclick="generateScheme('triadic')">Triadic</button>
+        <button onclick="generateScheme('complementary')">Complementary</button>
+        <button onclick="generateScheme('splitComplementary')">Split-Complementary</button>
+        <button onclick="generateScheme('square')">Square</button>
+        <button onclick="generateScheme('compound')">Compound</button>
+        <button onclick="generateScheme('shades')">Shades</button>
+    </div>
+
+    <div class="input-container" id="resultContainer">
+        <!-- Color inputs will be dynamically generated here -->
+    </div>
+
+    <script>
+        const canvas = document.getElementById('colorWheel');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = Math.min(width, height) / 2 - 10;
+
+        // Create a color wheel
+        function drawColorWheel() {
+            const steps = 360; // Degrees of the circle
+            for (let i = 0; i < steps; i++) {
+                const angle = (i * Math.PI) / 180;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + (Math.PI / 180));
+                ctx.closePath();
+                ctx.fillStyle = `hsl(${i}, 100%, 50%)`;
+                ctx.fill();
+            }
+        }
+
+        // Helper: Convert HEX to HSL
+        function hexToHSL(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) / 255;
+            let g = parseInt(hex.slice(3, 5), 16) / 255;
+            let b = parseInt(hex.slice(5, 7), 16) / 255;
+            let max = Math.max(r, g, b),
+                min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+
+            if (max === min) {
+                h = s = 0; // achromatic
+            } else {
+                let d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+
+            return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+        }
+
+        // Helper: Convert HSL to HEX
+        function hslToHex(h, s, l) {
+            s /= 100;
+            l /= 100;
+            const a = s * Math.min(l, 1 - l);
+            const f = (n) => {
+                const k = (n + h / 30) % 12;
+                return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            };
+            return `#${[f(0), f(8), f(4)]
+                .map((x) => Math.round(x * 255).toString(16).padStart(2, '0'))
+                .join('')}`;
+        }
+
+        // Color schemes
+        const schemes = {
+            analogous: (hue) => [hue - 30, hue, hue + 30].map((h) => (h + 360) % 360),
+            monochromatic: (hue) => [hue],
+            triadic: (hue) => [hue, (hue + 120) % 360, (hue + 240) % 360],
+            complementary: (hue) => [hue, (hue + 180) % 360],
+            splitComplementary: (hue) => [hue, (hue + 150) % 360, (hue + 210) % 360],
+            square: (hue) => [hue, (hue + 90) % 360, (hue + 180) % 360, (hue + 270) % 360],
+            compound: (hue) => [hue, (hue + 60) % 360, (hue + 180) % 360],
+            shades: (hue) => [`hsl(${hue}, 100%, 25%)`, `hsl(${hue}, 100%, 50%)`, `hsl(${hue}, 100%, 75%)`],
+        };
+
+        // Generate and display palette
+        function generateScheme(type) {
+            const baseColor = document.getElementById('basecolor').value;
+            const [h, s, l] = hexToHSL(baseColor);
+
+            const hues = schemes[type](h);
+            const resultContainer = document.getElementById('resultContainer');
+            resultContainer.innerHTML = ''; // Clear previous results
+
+            hues.forEach((hue) => {
+                const hex = typeof hue === 'string' ? hue : hslToHex(hue, s, l);
+                const colorDiv = document.createElement('div');
+                colorDiv.className = 'color-div';
+                colorDiv.innerHTML = `
+                    <input type="color" class="color-picker" value="${hex}">
+                    <input type="text" class="hex-input" value="${hex}" readonly>
+                `;
+                resultContainer.appendChild(colorDiv);
+            });
+        }
+
+        // Handle click events on the color wheel
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const imageData = ctx.getImageData(x, y, 1, 1).data;
+            const hex = `#${[imageData[0], imageData[1], imageData[2]]
+                .map((v) => v.toString(16).padStart(2, '0'))
+                .join('')}`;
+            document.getElementById('basecolor').value = hex;
+        });
+
+        drawColorWheel();
+    </script>
+</body>
+
+</html>
